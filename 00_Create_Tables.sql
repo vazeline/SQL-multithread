@@ -8,9 +8,7 @@ BEGIN
     CREATE TABLE dbo.Suppliers
     (
         SupplierId   INT          NOT NULL PRIMARY KEY,
-        SupplierName NVARCHAR(255) NULL,
-        IsActive     BIT          NOT NULL CONSTRAINT DF_Suppliers_IsActive DEFAULT(1),
-        CreatedAt    DATETIME2     NOT NULL CONSTRAINT DF_Suppliers_CreatedAt DEFAULT(SYSUTCDATETIME())
+        SupplierName NVARCHAR(255) NULL
     );
 END
 GO
@@ -49,7 +47,6 @@ BEGIN
         SkuId     BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         BrandId   INT    NOT NULL,
         ArticleId BIGINT NOT NULL,
-        CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_Sku_CreatedAt DEFAULT(SYSUTCDATETIME()),
         CONSTRAINT FK_Sku_Brands   FOREIGN KEY (BrandId)   REFERENCES dbo.Brands(BrandId),
         CONSTRAINT FK_Sku_Articles FOREIGN KEY (ArticleId) REFERENCES dbo.Articles(ArticleId)
     );
@@ -68,7 +65,6 @@ BEGIN
         SkuId      BIGINT NOT NULL,
         Qty        INT    NOT NULL,
         Price      MONEY  NOT NULL,
-        UpdatedAt  DATETIME2 NOT NULL CONSTRAINT DF_Offers_UpdatedAt DEFAULT(SYSUTCDATETIME()),
         CONSTRAINT FK_Offers_Suppliers FOREIGN KEY (SupplierId) REFERENCES dbo.Suppliers(SupplierId),
         CONSTRAINT FK_Offers_Sku       FOREIGN KEY (SkuId)       REFERENCES dbo.Sku(SkuId)
     );
@@ -85,7 +81,6 @@ BEGIN
     (
         OfferId BIGINT       NOT NULL PRIMARY KEY,
         Descr   VARCHAR(MAX) NULL,
-        UpdatedAt DATETIME2  NOT NULL CONSTRAINT DF_Descr_UpdatedAt DEFAULT(SYSUTCDATETIME()),
         CONSTRAINT FK_Descr_Offers FOREIGN KEY (OfferId) REFERENCES dbo.Offers(OfferId) ON DELETE CASCADE
     );
 END
@@ -101,8 +96,7 @@ BEGIN
         Article    VARCHAR(255) NOT NULL,
         Qty        INT          NOT NULL,
         Price      MONEY        NOT NULL,
-        Descr      VARCHAR(MAX) NULL,
-        LoadedAt   DATETIME2    NOT NULL CONSTRAINT DF_Prices_LoadedAt DEFAULT(SYSUTCDATETIME())
+        Descr      VARCHAR(MAX) NULL
     );
 
     CREATE NONCLUSTERED INDEX IX_Prices_Supplier ON dbo.Prices(SupplierId);
