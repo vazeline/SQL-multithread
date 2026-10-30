@@ -5,6 +5,17 @@ SET NOCOUNT ON;
 SET STATISTICS IO ON;
 SET STATISTICS TIME ON;
 
+-- сброс перед повторным запуском теста
+UPDATE [ECommerce].[dbo].[Prices] SET Status = 0;
+TRUNCATE TABLE dbo.Descr;
+DELETE FROM dbo.Offers;
+DELETE FROM dbo.Sku;
+DELETE FROM dbo.Articles;
+DELETE FROM dbo.Brands;
+DELETE FROM dbo.PriceBatchLog;
+DELETE FROM dbo.PriceProcessErrorLog;
+GO
+
 -- =====================================================
 -- ТЕСТ 1: Последовательно - разные поставщики
 -- =====================================================

@@ -84,15 +84,24 @@ BEGIN
         SourcePriceRowId UNIQUEIDENTIFIER -- ID исходной строки из таблицы Prices
     );
     
-    INSERT INTO dbo.Offers(SupplierId, SkuId, Qty, Price) 
-	OUTPUT inserted.OfferId, source.Id -- Связываем созданный ID с исходным ID строки
-    INTO #IdMapping (NewOfferId, SourcePriceRowId)
-    SELECT @SupplierId, sk.SkuId, s.Qty, s.Price
-	FROM #NewOffers s
-	JOIN dbo.Brands b ON b.Brand = s.Brand
-	JOIN dbo.Articles a ON a.Article = s.Article
-	JOIN dbo.Sku sk ON sk.BrandID = b.BrandID AND sk.ArticleID = a.ArticleID
-;
+   MERGE dbo.Offers WITH (ROWLOCK) AS target
+    USING (
+        SELECT 
+            s.Id,
+            sk.SkuId, 
+            s.Price,
+            s.Qty
+        FROM #NewOffers s
+        JOIN dbo.Brands b ON b.Brand = s.Brand
+        JOIN dbo.Articles a ON a.Article = s.Article
+        JOIN dbo.Sku sk ON sk.BrandId = b.BrandId AND sk.ArticleId = a.ArticleId
+    ) AS source
+    ON 1 = 0  -- Условие заведомо ложное, чтобы всегда выполнялся только INSERT
+    WHEN NOT MATCHED THEN
+        INSERT (SupplierId, SkuId, Qty, Price)
+        VALUES (@SupplierId, source.SkuId, source.Qty, source.Price)
+    OUTPUT inserted.OfferId, source.Id  -- Связываем созданный ID с исходным ID строки
+    INTO #IdMapping (NewOfferId, SourcePriceRowId);
 
     -- 5) Descr по новым OfferId
     INSERT dbo.Descr (OfferId, Descr)
