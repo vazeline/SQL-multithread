@@ -5,7 +5,7 @@ USE [ECommerce];
 GO
 -- Индексы под фильтрацию по SupplierId и поиск в справочниках
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Offers_SupplierId')
-    CREATE NONCLUSTERED INDEX IX_Offers_SupplierId ON dbo.Offers(SupplierId) INCLUDE (SkuId, Qty, Price, OfferId);
+    CREATE NONCLUSTERED INDEX IX_Offers_SupplierId ON dbo.Offers(SupplierId);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Sku_BrandArticle')
     CREATE UNIQUE NONCLUSTERED INDEX IX_Sku_BrandArticle ON dbo.Sku(BrandId, ArticleId);

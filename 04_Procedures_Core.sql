@@ -24,7 +24,7 @@ BEGIN
   
     BEGIN TRAN;
 	
-	-- Маркируем строки как "В обработке"
+	-- Маркируем строки как "В обработке" в транзакции, чтобы обеспечить атомарность операции
 	UPDATE dbo.Prices WITH (UPDLOCK,HOLDLOCK)
 	SET Status = 1, BatchId = @BatchId
 	WHERE SupplierId = @SupplierId AND Status = 0;
