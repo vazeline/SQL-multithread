@@ -1,7 +1,8 @@
--- 01_Indexes_And_Schema_Ext.sql
+
 -- Рекомендуется для минимизации блокировок читателей
 -- ALTER DATABASE [ECommerce] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;
-
+USE [ECommerce];
+GO
 -- Индексы под фильтрацию по SupplierId и поиск в справочниках
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Offers_SupplierId')
     CREATE NONCLUSTERED INDEX IX_Offers_SupplierId ON dbo.Offers(SupplierId) INCLUDE (SkuId, Qty, Price, OfferId);

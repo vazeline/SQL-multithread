@@ -1,4 +1,4 @@
--- 00_Create_Tables.sql
+
 USE [ECommerce];
 GO
 

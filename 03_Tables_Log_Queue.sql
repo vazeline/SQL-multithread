@@ -1,4 +1,4 @@
--- 03_Tables_Log_Queue.sql
+
 IF OBJECT_ID('dbo.PriceBatchLog','U') IS NULL
 CREATE TABLE dbo.PriceBatchLog (
   BatchId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY DEFAULT NEWID(),

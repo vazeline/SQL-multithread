@@ -20,18 +20,23 @@ BEGIN
   SELECT @BatchId, @SupplierId, 'ENQUEUED', COUNT(*), SYSUTCDATETIME()
   FROM dbo.Prices WHERE SupplierId = @SupplierId;
  
-  
   BEGIN TRY
   
     BEGIN TRAN;
-    -- Маркируем строки как "В обработке"
-    UPDATE dbo.Prices WITH (UPDLOCK,HOLDLOCK)
-    SET Status = 1, BatchId = @BatchId
-    WHERE SupplierId = @SupplierId AND Status = 0;
+	
+	-- Маркируем строки как "В обработке"
+	UPDATE dbo.Prices WITH (UPDLOCK,HOLDLOCK)
+	SET Status = 1, BatchId = @BatchId
+	WHERE SupplierId = @SupplierId AND Status = 0;
     	
     IF @@ROWCOUNT = 0 
 	BEGIN
-	  ROLLBACK TRAN
+	  ROLLBACK TRAN;
+      UPDATE dbo.PriceBatchLog
+      SET Status='DONE', 
+  	    RowsOffersIns = 0, 
+  	    FinishedAt = SYSUTCDATETIME() 
+      WHERE BatchId = @BatchId;
 	  RETURN;
 	END
 	
@@ -82,7 +87,7 @@ BEGIN
     INSERT INTO dbo.Offers(SupplierId, SkuId, Qty, Price) 
 	OUTPUT inserted.OfferId, source.Id -- Связываем созданный ID с исходным ID строки
     INTO #IdMapping (NewOfferId, SourcePriceRowId)
-    SELECT @SupplierId, s.SkuId, s.Qty, s.Price
+    SELECT @SupplierId, sk.SkuId, s.Qty, s.Price
 	FROM #NewOffers s
 	JOIN dbo.Brands b ON b.Brand = s.Brand
 	JOIN dbo.Articles a ON a.Article = s.Article
@@ -109,7 +114,8 @@ BEGIN
     
   END TRY
   BEGIN CATCH
-    
+    IF @@TRANCOUNT > 0 ROLLBACK;
+	
     INSERT dbo.PriceProcessErrorLog(BatchId,SupplierId,ErrorNumber,ErrorSeverity,ErrorState,ErrorProcedure,ErrorLine,ErrorMessage)
     VALUES (@BatchId,@SupplierId,ERROR_NUMBER(),ERROR_SEVERITY(),ERROR_STATE(),ERROR_PROCEDURE(),ERROR_LINE(),ERROR_MESSAGE());
     
