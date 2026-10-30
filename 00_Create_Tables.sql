@@ -69,7 +69,7 @@ BEGIN
         CONSTRAINT FK_Offers_Sku       FOREIGN KEY (SkuId)       REFERENCES dbo.Sku(SkuId)
     );
 
-    CREATE NONCLUSTERED INDEX IX_Offers_SupplierId ON dbo.Offers(SupplierId) INCLUDE (SkuId, Qty, Price, OfferId);
+    CREATE NONCLUSTERED INDEX IX_Offers_SupplierId ON dbo.Offers(SupplierId);
 END
 GO
 

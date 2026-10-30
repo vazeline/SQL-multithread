@@ -8,7 +8,7 @@ BEGIN
 
   DECLARE @BatchId UNIQUEIDENTIFIER = NEWID();
 
-  IF EXISTS(SELECT 1 FROM dbo.Suppliers WHERE SupplierId = @SupplierId) 
+  IF NOT EXISTS(SELECT 1 FROM dbo.Suppliers WHERE SupplierId = @SupplierId) 
   BEGIN
     INSERT dbo.PriceProcessErrorLog(BatchId,SupplierId,ErrorNumber,ErrorSeverity,ErrorState,ErrorProcedure,ErrorLine,ErrorMessage)
     VALUES (@BatchId,@SupplierId,NULL,NULL,NULL,NULL,NULL,'Supplier with SupplierId=' + @SupplierId +' not found');
@@ -22,15 +22,21 @@ BEGIN
  
   
   BEGIN TRY
+  
     BEGIN TRAN;
-
     -- Маркируем строки как "В обработке"
-    UPDATE dbo.Prices 
+    UPDATE dbo.Prices WITH (UPDLOCK,HOLDLOCK)
     SET Status = 1, BatchId = @BatchId
     WHERE SupplierId = @SupplierId AND Status = 0;
     	
-    IF @@ROWCOUNT = 0 RETURN;
-    
+    IF @@ROWCOUNT = 0 
+	BEGIN
+	  ROLLBACK TRAN
+	  RETURN;
+	END
+	
+    COMMIT;
+	
     CREATE TABLE #NewOffers(Brand VARCHAR(100), Article VARCHAR(100), Price MONEY, Qty INT, Descr VARCHAR(255), Id UNIQUEIDENTIFIER);
     
     -- 1. Сначала готовим данные в памяти/tempdb БЕЗ транзакции и блокировок основной таблицы
@@ -69,46 +75,32 @@ BEGIN
   
     -- Таблица для маппинга ID
     CREATE TABLE #IdMapping (
-        NewOfferId UNIQUEIDENTIFIER,
-        SourcePriceRowId BIGINT -- ID исходной строки из таблицы Prices
+        NewOfferId BIGINT,
+        SourcePriceRowId UNIQUEIDENTIFIER -- ID исходной строки из таблицы Prices
     );
     
-    MERGE dbo.Offers WITH (ROWLOCK) AS target
-    USING (
-    	SELECT 
-    		s.Id,
-    		sk.SkuId, 
-    		s.Price,
-    		s.Qty
-    	FROM #NewOffers s
-    	JOIN dbo.Brands b ON b.Brand = s.Brand
-    	JOIN dbo.Articles a ON a.Article = s.Article
-    	JOIN dbo.Sku sk ON sk.BrandID = b.BrandID AND sk.ArticleID = a.ArticleID
-    ) AS source
-    ON 1 = 0 -- Условие заведомо ложное, чтобы всегда выполнялся только INSERT
-    WHEN NOT MATCHED THEN
-    	INSERT (SupplierId, SkuId, Qty, Price)
-    	VALUES (@SupplierId, source.SkuId, source.Qty, source.Price)
-    OUTPUT inserted.OfferId, source.Id -- Связываем созданный ID с исходным ID строки
-    INTO #IdMapping (NewOfferId, SourcePriceRowId);
-  
-    -- 5) Descr по новым OfferId
-    DELETE d FROM dbo.Descr d
-    WHERE EXISTS (SELECT 1 FROM dbo.Offers o WHERE o.SupplierId = @SupplierId AND o.OfferId = d.OfferId);
+    INSERT INTO dbo.Offers(SupplierId, SkuId, Qty, Price) 
+	OUTPUT inserted.OfferId, source.Id -- Связываем созданный ID с исходным ID строки
+    INTO #IdMapping (NewOfferId, SourcePriceRowId)
+    SELECT @SupplierId, s.SkuId, s.Qty, s.Price
+	FROM #NewOffers s
+	JOIN dbo.Brands b ON b.Brand = s.Brand
+	JOIN dbo.Articles a ON a.Article = s.Article
+	JOIN dbo.Sku sk ON sk.BrandID = b.BrandID AND sk.ArticleID = a.ArticleID
+;
 
+    -- 5) Descr по новым OfferId
     INSERT dbo.Descr (OfferId, Descr)
     SELECT m.NewOfferId, s.Descr
     FROM #IdMapping m 
-	JOIN #NewOffers s ON s.Id = m.SourcePriceRowId;
-	WHERE s.Descr IS NOT NULL
+	JOIN #NewOffers s ON s.Id = m.SourcePriceRowId
+	WHERE s.Descr IS NOT NULL;
   
     UPDATE dbo.PriceBatchLog 
     SET Status='DONE', 
   	  RowsOffersIns = (SELECT COUNT(*) FROM dbo.Offers WHERE SupplierId = @SupplierId), 
   	  FinishedAt = SYSUTCDATETIME() 
     WHERE BatchId = @BatchId;
-  
-    COMMIT;
     
     -- Финализируем статус во входной таблице
     UPDATE dbo.Prices 
@@ -117,7 +109,6 @@ BEGIN
     
   END TRY
   BEGIN CATCH
-    IF @@TRANCOUNT > 0 ROLLBACK;
     
     INSERT dbo.PriceProcessErrorLog(BatchId,SupplierId,ErrorNumber,ErrorSeverity,ErrorState,ErrorProcedure,ErrorLine,ErrorMessage)
     VALUES (@BatchId,@SupplierId,ERROR_NUMBER(),ERROR_SEVERITY(),ERROR_STATE(),ERROR_PROCEDURE(),ERROR_LINE(),ERROR_MESSAGE());
