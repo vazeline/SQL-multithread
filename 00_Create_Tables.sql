@@ -8,7 +8,7 @@ BEGIN
     CREATE TABLE dbo.Suppliers
     (
         SupplierId   INT          NOT NULL PRIMARY KEY,
-        SupplierName NVARCHAR(255) NULL
+        SupplierName NVARCHAR(100) NULL
     );
 END
 GO
@@ -19,7 +19,7 @@ BEGIN
     CREATE TABLE dbo.Brands
     (
         BrandId INT          IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        Brand   VARCHAR(255) NOT NULL
+        Brand   VARCHAR(100) NOT NULL
     );
 
     CREATE UNIQUE NONCLUSTERED INDEX UX_Brands_Brand ON dbo.Brands(Brand);
@@ -32,7 +32,7 @@ BEGIN
     CREATE TABLE dbo.Articles
     (
         ArticleId BIGINT       IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        Article   VARCHAR(255) NOT NULL
+        Article   VARCHAR(100) NOT NULL
     );
 
     CREATE UNIQUE NONCLUSTERED INDEX UX_Articles_Article ON dbo.Articles(Article);
@@ -70,7 +70,6 @@ BEGIN
     );
 
     CREATE NONCLUSTERED INDEX IX_Offers_SupplierId ON dbo.Offers(SupplierId) INCLUDE (SkuId, Qty, Price, OfferId);
-    CREATE NONCLUSTERED INDEX IX_Offers_SkuId      ON dbo.Offers(SkuId);
 END
 GO
 
@@ -80,7 +79,7 @@ BEGIN
     CREATE TABLE dbo.Descr
     (
         OfferId BIGINT       NOT NULL PRIMARY KEY,
-        Descr   VARCHAR(MAX) NULL,
+        Descr   VARCHAR(255) NULL,
         CONSTRAINT FK_Descr_Offers FOREIGN KEY (OfferId) REFERENCES dbo.Offers(OfferId) ON DELETE CASCADE
     );
 END
@@ -92,14 +91,15 @@ BEGIN
     CREATE TABLE dbo.Prices
     (
         SupplierId INT          NOT NULL,
-        Brand      VARCHAR(255) NOT NULL,
-        Article    VARCHAR(255) NOT NULL,
+        Brand      VARCHAR(100) NOT NULL,
+        Article    VARCHAR(100) NOT NULL,
         Qty        INT          NOT NULL,
         Price      MONEY        NOT NULL,
-        Descr      VARCHAR(MAX) NULL
+        Descr      VARCHAR(255) NULL,
+		Status 	   INT NOT NULL DEFAULT 0, -- 0-Новый, 1-В обработке, 2-Успешно, 3-Ошибка
+		BatchId    UNIQUEIDENTIFIER NOT NULL, -- Для соответствия записям из одной заливки к записи в логе
     );
 
-    CREATE NONCLUSTERED INDEX IX_Prices_Supplier ON dbo.Prices(SupplierId);
-    CREATE NONCLUSTERED INDEX IX_Prices_BrandArticle ON dbo.Prices(Brand, Article);
+    CREATE NONCLUSTERED INDEX IX_Prices_Supplier ON dbo.Prices(SupplierId, Status);
 END
 GO

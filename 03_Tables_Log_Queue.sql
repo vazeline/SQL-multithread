@@ -25,17 +25,4 @@ CREATE TABLE dbo.PriceProcessErrorLog (
   LogAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 );
 
-IF OBJECT_ID('dbo.PriceBatchStaging','U') IS NULL
-CREATE TABLE dbo.PriceBatchStaging (
-  BatchId UNIQUEIDENTIFIER NOT NULL,
-  SupplierId INT NOT NULL,
-  Brand VARCHAR(255) NOT NULL,
-  Article VARCHAR(255) NOT NULL,
-  Qty INT NOT NULL,
-  Price MONEY NOT NULL,
-  Descr VARCHAR(MAX) NULL,
-  RowNum INT IDENTITY(1,1)
-);
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PBS_Batch')
-    CREATE INDEX IX_PBS_Batch ON dbo.PriceBatchStaging(BatchId);
-GO
+

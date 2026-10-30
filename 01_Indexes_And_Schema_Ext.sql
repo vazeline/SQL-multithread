@@ -16,5 +16,5 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_Articles_Article')
     CREATE UNIQUE NONCLUSTERED INDEX UX_Articles_Article ON dbo.Articles(Article);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Prices_Supplier')
-    CREATE NONCLUSTERED INDEX IX_Prices_Supplier ON dbo.Prices(SupplierId);
+    CREATE NONCLUSTERED INDEX IX_Prices_Supplier ON dbo.Prices(SupplierId, Status);
 GO
