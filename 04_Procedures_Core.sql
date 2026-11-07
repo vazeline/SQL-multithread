@@ -73,32 +73,61 @@ BEGIN
     JOIN dbo.Articles a ON a.Article = s.Article;
   
     -- 4) Полностью заменить Offers этого SupplierId
-    DELETE o FROM dbo.Offers o WITH (ROWLOCK) WHERE o.SupplierId = @SupplierId;
+    -- Гарантируем, что за один шаг удаляется не более 4000 строк 
+	-- (это гарантированно защищает от эскалации блокировки строки до таблицы)
+	WHILE 1 = 1
+	BEGIN
+		DELETE TOP (4000) o 
+		FROM dbo.Offers o WITH (ROWLOCK)
+		WHERE o.SupplierId = @SupplierId;
+		
+		-- Если удалять больше нечего, выходим из цикла
+		IF @@ROWCOUNT = 0
+			BREAK;
+	END
   
     -- Таблица для маппинга ID
     CREATE TABLE #IdMapping (
         NewOfferId BIGINT,
         SourcePriceRowId UNIQUEIDENTIFIER -- ID исходной строки из таблицы Prices
     );
-    
-   MERGE dbo.Offers WITH (ROWLOCK) AS target
-    USING (
-        SELECT 
-            s.Id,
-            sk.SkuId, 
-            s.Price,
-            s.Qty
-        FROM #NewOffers s
-        JOIN dbo.Brands b ON b.Brand = s.Brand
-        JOIN dbo.Articles a ON a.Article = s.Article
-        JOIN dbo.Sku sk ON sk.BrandId = b.BrandId AND sk.ArticleId = a.ArticleId
-    ) AS source
-    ON 1 = 0  -- Условие заведомо ложное, чтобы всегда выполнялся только INSERT
-    WHEN NOT MATCHED THEN
-        INSERT (SupplierId, SkuId, Qty, Price)
-        VALUES (@SupplierId, source.SkuId, source.Qty, source.Price)
-    OUTPUT inserted.OfferId, source.Id  -- Связываем созданный ID с исходным ID строки
-    INTO #IdMapping (NewOfferId, SourcePriceRowId);
+	
+	-- 4.1) Вставка новых Offers
+	-- Шаг 1. Готовим данные во временную таблицу и сразу нумеруем их по порядку (Id_Row)
+	SELECT 
+		ROW_NUMBER() OVER (ORDER BY s.Id) AS Id_Row,
+		s.Id AS SourcePriceRowId,
+		sk.SkuId, 
+		s.Price,
+		s.Qty
+	INTO #PreparedOffers
+	FROM #NewOffers s
+	JOIN dbo.Brands b ON b.Brand = s.Brand
+	JOIN dbo.Articles a ON a.Article = s.Article
+	JOIN dbo.Sku sk ON sk.BrandId = b.BrandId AND sk.ArticleId = a.ArticleId
+	ORDER BY s.Id; -- Гарантируем строгий порядок
+
+	-- Шаг 2. Заводим таблицу для перехвата сгенерированных OfferId (тоже с автоинкрементом для связи)
+	CREATE TABLE #InsertedIds (
+		Id_Row INT IDENTITY(1,1),
+		NewOfferId INT
+	);
+
+	-- Шаг 3. Чистый INSERT с OUTPUT. 
+	-- Сортировка ORDER BY гарантирует, что порядок вставки совпадет с нумерацией Id_Row
+	INSERT dbo.Offers (SupplierId, SkuId, Qty, Price)
+	OUTPUT inserted.OfferId INTO #InsertedIds(NewOfferId)
+	SELECT @SupplierId, SkuId, Qty, Price
+	FROM #PreparedOffers
+	ORDER BY Id_Row;
+
+	-- Шаг 4. Наш готовый маппинг. Просто джойним по порядковому номеру Id_Row!
+	INSERT INTO #IdMapping (NewOfferId, SourcePriceRowId)
+	SELECT 
+		i.NewOfferId,
+		p.SourcePriceRowId
+	FROM #InsertedIds i
+	JOIN #PreparedOffers p ON p.Id_Row = i.Id_Row;
 
     -- 5) Descr по новым OfferId
     INSERT dbo.Descr (OfferId, Descr)
@@ -114,9 +143,16 @@ BEGIN
     WHERE BatchId = @BatchId;
     
     -- Финализируем статус во входной таблице
-    UPDATE dbo.Prices 
-    SET Status = 2 
-    WHERE SupplierId = @SupplierId AND Status = 1;
+	WHILE 1 = 1
+	BEGIN
+		-- Обновляем только по 4000 строк за шаг, чтобы не заблокировать всю таблицу
+		UPDATE TOP (4000) dbo.Prices 
+		SET Status = 2 
+		WHERE SupplierId = @SupplierId AND Status = 1;
+		
+		IF @@ROWCOUNT = 0
+			BREAK;
+	END
     
   END TRY
   BEGIN CATCH
