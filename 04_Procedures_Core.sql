@@ -90,20 +90,34 @@ BEGIN
 		);
 
 		-- 4.1) Вставка новых Offers
-		MERGE dbo.Offers AS tgt
-		USING (
-			SELECT s.Id, sk.SkuId, s.Price, s.Qty
-			FROM #NewOffers s
-			JOIN dbo.Brands b ON b.Brand = s.Brand
-			JOIN dbo.Articles a ON a.Article = s.Article
-			JOIN dbo.Sku sk ON sk.BrandId = b.BrandId AND sk.ArticleId = a.ArticleId
-		) AS src
-		ON 1 = 0
-		WHEN NOT MATCHED THEN
-			INSERT (SupplierId, SkuId, Qty, Price)
-			VALUES (@SupplierId, src.SkuId, src.Qty, src.Price)
-		OUTPUT inserted.OfferId, src.Id -- Связываем созданный ID с исходным ID строки
-		INTO #IdMapping (NewOfferId, SourcePriceRowId);
+		SELECT
+			ROW_NUMBER() OVER (ORDER BY s.Id) AS Id_Row,
+			s.Id AS SourcePriceRowId,
+			sk.SkuId,
+			s.Price,
+			s.Qty
+		INTO #PreparedOffers
+		FROM #NewOffers s
+		JOIN dbo.Brands b ON b.Brand = s.Brand
+		JOIN dbo.Articles a ON a.Article = s.Article
+		JOIN dbo.Sku sk ON sk.BrandId = b.BrandId AND sk.ArticleId = a.ArticleId;
+
+		CREATE TABLE #InsertedIds (
+			Id_Row INT IDENTITY(1,1),
+			NewOfferId BIGINT
+		);
+
+		INSERT dbo.Offers (SupplierId, SkuId, Qty, Price)
+		OUTPUT inserted.OfferId INTO #InsertedIds(NewOfferId)
+		SELECT @SupplierId, SkuId, Qty, Price
+		FROM #PreparedOffers
+		ORDER BY Id_Row
+		OPTION (MAXDOP 1);
+
+		INSERT INTO #IdMapping (NewOfferId, SourcePriceRowId)
+		SELECT i.NewOfferId, p.SourcePriceRowId
+		FROM #InsertedIds i
+		JOIN #PreparedOffers p ON p.Id_Row = i.Id_Row;
 
 		-- 5) Descr по новым OfferId 
 		INSERT dbo.Descr (OfferId, Descr)
