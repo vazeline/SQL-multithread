@@ -58,22 +58,19 @@ BEGIN
     -- 1) Brands
     INSERT dbo.Brands (Brand)
     SELECT DISTINCT s.Brand
-    FROM #NewOffers s
-    WHERE NOT EXISTS (SELECT 1 FROM dbo.Brands b WITH (UPDLOCK,HOLDLOCK) WHERE b.Brand = s.Brand);
+    FROM #NewOffers s;
   
     -- 2) Articles
     INSERT dbo.Articles (Article)
     SELECT DISTINCT s.Article
-    FROM #NewOffers s
-    WHERE NOT EXISTS (SELECT 1 FROM dbo.Articles a WITH (UPDLOCK,HOLDLOCK) WHERE a.Article = s.Article);
+    FROM #NewOffers s;
   
     -- 3) Sku
     INSERT dbo.Sku (BrandId, ArticleId)
     SELECT DISTINCT b.BrandId, a.ArticleId
     FROM #NewOffers s
     JOIN dbo.Brands b ON b.Brand = s.Brand
-    JOIN dbo.Articles a ON a.Article = s.Article
-    WHERE NOT EXISTS (SELECT 1 FROM dbo.Sku sk WITH (UPDLOCK,HOLDLOCK) WHERE sk.BrandId = b.BrandId AND sk.ArticleId = a.ArticleId);
+    JOIN dbo.Articles a ON a.Article = s.Article;
   
     -- 4) Полностью заменить Offers этого SupplierId
     DELETE o FROM dbo.Offers o WITH (ROWLOCK) WHERE o.SupplierId = @SupplierId;

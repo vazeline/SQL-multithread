@@ -22,7 +22,7 @@ BEGIN
         Brand   VARCHAR(100) NOT NULL
     );
 
-    CREATE UNIQUE NONCLUSTERED INDEX UX_Brands_Brand ON dbo.Brands(Brand);
+    CREATE UNIQUE NONCLUSTERED INDEX UX_Brands_Brand ON dbo.Brands(Brand) WITH (IGNORE_DUP_KEY = ON);
 END
 GO
 
@@ -35,7 +35,7 @@ BEGIN
         Article   VARCHAR(100) NOT NULL
     );
 
-    CREATE UNIQUE NONCLUSTERED INDEX UX_Articles_Article ON dbo.Articles(Article);
+    CREATE UNIQUE NONCLUSTERED INDEX UX_Articles_Article ON dbo.Articles(Article) WITH (IGNORE_DUP_KEY = ON);
 END
 GO
 
@@ -51,7 +51,7 @@ BEGIN
         CONSTRAINT FK_Sku_Articles FOREIGN KEY (ArticleId) REFERENCES dbo.Articles(ArticleId)
     );
 
-    CREATE UNIQUE NONCLUSTERED INDEX IX_Sku_BrandArticle ON dbo.Sku(BrandId, ArticleId);
+    CREATE UNIQUE NONCLUSTERED INDEX IX_Sku_BrandArticle ON dbo.Sku(BrandId, ArticleId) WITH (IGNORE_DUP_KEY = ON);
 END
 GO
 
